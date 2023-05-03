@@ -20,9 +20,14 @@ import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
 import androidx.fragment.app.Fragment
+import androidx.fragment.app.activityViewModels
+import androidx.lifecycle.coroutineScope
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import com.example.busschedule.databinding.StopScheduleFragmentBinding
+import com.example.busschedule.viewmodels.BusScheduleViewModel
+import com.example.busschedule.viewmodels.BusScheduleViewModelFactory
+import kotlinx.coroutines.launch
 
 class StopScheduleFragment: Fragment() {
 
@@ -37,6 +42,13 @@ class StopScheduleFragment: Fragment() {
     private lateinit var recyclerView: RecyclerView
 
     private lateinit var stopName: String
+
+    // referência ao modelo de visualização
+    private val viewModel: BusScheduleViewModel by activityViewModels {
+        BusScheduleViewModelFactory(
+            (activity?.application as BusScheduleApplication).database.scheduleDao()
+        )
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -58,8 +70,23 @@ class StopScheduleFragment: Fragment() {
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
+        // configura a visualização de reciclagem
         recyclerView = binding.recyclerView
         recyclerView.layoutManager = LinearLayoutManager(requireContext())
+
+        // função com bloco vaziocom {} pois nada deve aconteçer ao tocar nas linhas dessa tela.
+        val busStopAdapter = BusStopAdapter({})
+        recyclerView.adapter = busStopAdapter
+        // submitList() is a call that accesses the database. To prevent the
+        // call from potentially locking the UI, you should use a
+        // coroutine scope to launch the function. Using GlobalScope is not
+        // best practice, and in the next step we'll see how to improve this.
+           // busStopAdapter.submitList(viewModel.scheduleForStopName(stopName))
+            lifecycle.coroutineScope.launch {
+                viewModel.scheduleForStopName(stopName).collect() {
+                    busStopAdapter.submitList(it)
+            }
+        }
     }
 
     override fun onDestroyView() {
